@@ -461,7 +461,7 @@ class Zend_Db_Select
     public function where($cond, $value = null, $type = null)
     {
         $this->_parts[self::WHERE][] = $this->_where($cond, $value, $type, true);
-
+		
         return $this;
     }
 
@@ -667,6 +667,7 @@ class Zend_Db_Select
      */
     public function query($fetchMode = null, $bind = array())
     {
+    	//var_dump($bind);exit;
         if (!empty($bind)) {
             $this->bind($bind);
         }
@@ -675,8 +676,11 @@ class Zend_Db_Select
         if ($fetchMode == null) {
             $fetchMode = $this->_adapter->getFetchMode();
         }
+        
         $stmt->setFetchMode($fetchMode);
+         //var_dump($stmt);exit;
         return $stmt;
+       
     }
 
     /**

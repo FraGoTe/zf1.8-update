@@ -317,6 +317,8 @@ abstract class Zend_Db_Statement implements Zend_Db_Statement_Interface
     public function fetchAll($style = null, $col = null)
     {
         $data = array();
+
+        //var_dump($data);exit;
         if ($style === Zend_Db::FETCH_COLUMN && $col === null) {
             $col = 0;
         }
@@ -329,6 +331,7 @@ abstract class Zend_Db_Statement implements Zend_Db_Statement_Interface
                 $data[] = $val;
             }
         }
+        //var_dump($data);exit;
         return $data;
     }
 

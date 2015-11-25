@@ -121,6 +121,7 @@ class Zend_Config_Ini extends Zend_Config
                 $this->_skipExtends = (bool) $options['skipExtends'];
             }
         }
+        $allowModifications = true;
 
         $iniArray = $this->_loadIniFile($filename);
 

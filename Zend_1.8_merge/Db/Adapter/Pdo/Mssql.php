@@ -81,7 +81,7 @@ class Zend_Db_Adapter_Pdo_Mssql extends Zend_Db_Adapter_Pdo_Abstract
     {
         // baseline of DSN parts
         $dsn = $this->_config;
-
+		//var_dump($dsn);exit;
         // don't pass the username and password in the DSN
         unset($dsn['username']);
         unset($dsn['password']);
@@ -239,7 +239,7 @@ class Zend_Db_Adapter_Pdo_Mssql extends Zend_Db_Adapter_Pdo_Abstract
          * Discover primary key column(s) for this table.
          */
         $sql = "exec sp_pkeys @table_name = " . $this->quoteIdentifier($tableName, true);
-        $stmt = $this->query($sql);
+        $stmt = $this->query($sql, array(), array('tipo'=>'Z'));
         $primaryKeysResult = $stmt->fetchAll(Zend_Db::FETCH_NUM);
         $primaryKeyColumn = array();
         $pkey_column_name = 3;
@@ -284,10 +284,12 @@ class Zend_Db_Adapter_Pdo_Mssql extends Zend_Db_Adapter_Pdo_Abstract
                 'IDENTITY'         => $identity
             );
         }
+       if(is_array($desc)) 
+			$desc = array_change_key_case($desc,CASE_LOWER);
         return $desc;
     }
-
-    /**
+    
+	/**
      * Adds an adapter-specific LIMIT clause to the SELECT statement.
      *
      * @link http://lists.bestpractical.com/pipermail/rt-devel/2005-June/007339.html
@@ -300,7 +302,31 @@ class Zend_Db_Adapter_Pdo_Mssql extends Zend_Db_Adapter_Pdo_Abstract
      */
      public function limit($sql, $count, $offset = 0)
      {
-        $count = intval($count);
+     	$sql2 = preg_replace(
+            '/^SELECT\s+(DISTINCT\s)?/i',
+            '',
+            $sql
+            );
+     	$arr = explode('FROM',$sql2);
+     	//var_dump($arr);exit;
+     	$columns = trim($arr[0]); 
+     	$orden = '';
+
+     	$orderby = stristr($sql, 'ORDER BY');
+     	if ($orderby !== false) {
+     		$arr2 = explode('ORDER BY',$arr[1]);
+                if(isset($arr2[0])){
+                    $cuerpo = trim($arr2[0]);
+                }
+                if(isset($arr2[1])){
+                    $orden = trim($arr2[1]);
+                }
+     	}else
+     		$cuerpo = trim($arr[1]);
+     	//echo $columns.' FROM '.$cuerpo;exit;
+     	
+     	
+     	 $count = intval($count);
         if ($count <= 0) {
             /** @see Zend_Db_Adapter_Exception */
             require_once 'Zend/Db/Adapter/Exception.php';
@@ -314,23 +340,128 @@ class Zend_Db_Adapter_Pdo_Mssql extends Zend_Db_Adapter_Pdo_Abstract
             throw new Zend_Db_Adapter_Exception("LIMIT argument offset=$offset is not valid");
         }
 
-        $orderby = stristr($sql, 'ORDER BY');
-        if ($orderby !== false) {
-            $sort = (stripos($orderby, ' desc') !== false) ? 'desc' : 'asc';
-            $order = str_ireplace('ORDER BY', '', $orderby);
-            $order = trim(preg_replace('/\bASC\b|\bDESC\b/i', '', $order));
+        $sqlFinal = preg_replace(
+            '/^SELECT\s+(DISTINCT\s)?/i',
+            'SELECT $1TOP ' . ($count+$offset) . ' ',
+            $sql
+            );
+
+        if ($offset > 0) {
+            $orderby = stristr($sql, 'ORDER BY');
+
+            if ($orderby !== false) {
+                $orderParts = explode(',', substr($orderby, 8));
+                $pregReplaceCount = null;
+                $orderbyInverseParts = array();
+                foreach ($orderParts as $orderPart) {
+                    $orderPart = rtrim($orderPart);
+                    $inv = preg_replace('/\s+desc$/i', ' ASC', $orderPart, 1, $pregReplaceCount);
+                    if ($pregReplaceCount) {
+                        $orderbyInverseParts[] = $inv;
+                        continue;
+                    }
+                    $inv = preg_replace('/\s+asc$/i', ' DESC', $orderPart, 1, $pregReplaceCount);
+                    if ($pregReplaceCount) {
+                        $orderbyInverseParts[] = $inv;
+                        continue;
+                    } else {
+                        $orderbyInverseParts[] = $orderPart . ' DESC';
+                    }
+                }
+
+                $orderbyInverse = 'ORDER BY ' . implode(', ', $orderbyInverseParts);
+            }
+            $sql = 'SELECT * FROM (SELECT TOP ' . $count . ' * FROM (' . $sql . ') AS inner_tbl';
+            if ($orderby !== false) {
+                $sql .= ' ' . $orderbyInverse . ' ';
+            }
+            $sql .= ') AS outer_tbl';
+            if ($orderby !== false) {
+                $sql .= ' ' . $orderby;
+            }
+            
+            /*$sqlFinal = 'SELECT * FROM ( SELECT ROW_NUMBER() OVER(' . $orderby . ') AS ROWNUM,' . $columns . 
+            			' FROM ' . $cuerpo . ') AS Result ' . 
+            			'WHERE ROWNUM BETWEEN ' . intval($offset/$count) . ' * ' . $count . 
+            			' + 1 AND (' . intval($offset/$count) . ' + 1) * ' . $count;*/
+            $sqlFinal = 'SELECT * FROM ( SELECT ROW_NUMBER() OVER(' . $orderby . ') AS ROWNUM,' . $columns . 
+            			' FROM ' . $cuerpo . ') AS Result ' . 
+            			'WHERE ROWNUM BETWEEN ' . ((intval($offset/$count) * $count) + 1) .  
+            			' AND ' . ((intval($offset/$count) + 1) * $count);
+            ;
+            //echo $sqlFinal;exit;
+            
         }
 
-        $sql = preg_replace('/^SELECT\s/i', 'SELECT TOP ' . ($count+$offset) . ' ', $sql);
+        return $sqlFinal;
+    }
 
-        $sql = 'SELECT * FROM (SELECT TOP ' . $count . ' * FROM (' . $sql . ') AS inner_tbl';
-        if ($orderby !== false) {
-            $sql .= ' ORDER BY ' . $order . ' ';
-            $sql .= (stripos($sort, 'asc') !== false) ? 'DESC' : 'ASC';
+    /**
+     * Adds an adapter-specific LIMIT clause to the SELECT statement.
+     *
+     * @link http://lists.bestpractical.com/pipermail/rt-devel/2005-June/007339.html
+     *
+     * @param string $sql
+     * @param integer $count
+     * @param integer $offset OPTIONAL
+     * @throws Zend_Db_Adapter_Exception
+     * @return string
+     */
+     public function limit2($sql, $count, $offset = 0)
+     {
+     	 $count = intval($count);
+        if ($count <= 0) {
+            /** @see Zend_Db_Adapter_Exception */
+            require_once 'Zend/Db/Adapter/Exception.php';
+            throw new Zend_Db_Adapter_Exception("LIMIT argument count=$count is not valid");
         }
-        $sql .= ') AS outer_tbl';
-        if ($orderby !== false) {
-            $sql .= ' ORDER BY ' . $order . ' ' . $sort;
+
+        $offset = intval($offset);
+        if ($offset < 0) {
+            /** @see Zend_Db_Adapter_Exception */
+            require_once 'Zend/Db/Adapter/Exception.php';
+            throw new Zend_Db_Adapter_Exception("LIMIT argument offset=$offset is not valid");
+        }
+
+        $sql = preg_replace(
+            '/^SELECT\s+(DISTINCT\s)?/i',
+            'SELECT $1TOP ' . ($count+$offset) . ' ',
+            $sql
+            );
+
+        if ($offset > 0) {
+            $orderby = stristr($sql, 'ORDER BY');
+
+            if ($orderby !== false) {
+                $orderParts = explode(',', substr($orderby, 8));
+                $pregReplaceCount = null;
+                $orderbyInverseParts = array();
+                foreach ($orderParts as $orderPart) {
+                    $orderPart = rtrim($orderPart);
+                    $inv = preg_replace('/\s+desc$/i', ' ASC', $orderPart, 1, $pregReplaceCount);
+                    if ($pregReplaceCount) {
+                        $orderbyInverseParts[] = $inv;
+                        continue;
+                    }
+                    $inv = preg_replace('/\s+asc$/i', ' DESC', $orderPart, 1, $pregReplaceCount);
+                    if ($pregReplaceCount) {
+                        $orderbyInverseParts[] = $inv;
+                        continue;
+                    } else {
+                        $orderbyInverseParts[] = $orderPart . ' DESC';
+                    }
+                }
+
+                $orderbyInverse = 'ORDER BY ' . implode(', ', $orderbyInverseParts);
+            }
+            $sql = 'SELECT * FROM (SELECT TOP ' . $count . ' * FROM (' . $sql . ') AS inner_tbl';
+            if ($orderby !== false) {
+                $sql .= ' ' . $orderbyInverse . ' ';
+            }
+            $sql .= ') AS outer_tbl';
+            if ($orderby !== false) {
+                $sql .= ' ' . $orderby;
+            }
         }
 
         return $sql;

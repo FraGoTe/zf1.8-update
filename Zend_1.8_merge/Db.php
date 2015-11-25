@@ -247,7 +247,7 @@ class Zend_Db
             }
             unset($config['adapterNamespace']);
         }
-        $adapterName = strtolower($adapterNamespace . '_' . $adapter);
+        $adapterName = $adapterNamespace . '_' . $adapter;
         $adapterName = str_replace(' ', '_', ucwords(str_replace('_', ' ', $adapterName)));
 
         /*

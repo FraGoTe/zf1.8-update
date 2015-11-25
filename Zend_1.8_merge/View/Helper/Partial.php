@@ -62,7 +62,7 @@ class Zend_View_Helper_Partial extends Zend_View_Helper_Abstract
      * @return string|Zend_View_Helper_Partial
      */
     public function partial($name = null, $module = null, $model = null)
-    {
+    {   
         if (0 == func_num_args()) {
             return $this;
         }
@@ -99,7 +99,18 @@ class Zend_View_Helper_Partial extends Zend_View_Helper_Abstract
                 }
             }
         }
-
+        
+        /*add by JOVS 29/11/2012, for partial */
+        $zt = Zend_Registry::get('zt');
+        // default language
+        $s = new Zend_Session_Namespace('zt');
+        $s->lang = isset($s->lang)?$s->lang:'es';
+        $zt->setLocale($s->lang);
+        
+        $view->assign('zt', $zt);
+        $view->zt = $zt;
+        /**/
+        
         return $view->render($name);
     }
 

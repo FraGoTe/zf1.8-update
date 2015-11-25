@@ -238,6 +238,22 @@ class Zend_Controller_Dispatcher_Standard extends Zend_Controller_Dispatcher_Abs
             $controller = $request->getControllerName();
             if (!$this->getParam('useDefaultControllerAlways') && !empty($controller)) {
                 require_once 'Zend/Controller/Dispatcher/Exception.php';
+                if (CcolCod == '0057' || CcolCod == '0066')
+                    echo "<h1>P&aacute;gina no encontrada. Comun&iacute;quese con el &Aacute;rea de 
+                      Sistemas.<br/>
+                      </h1>
+                      ";
+                else
+                    echo "<h1>P&aacute;gina no encontrada. </h1>"
+                    . "<p>Comun&iacute;quese con el &aacute;rea de Sistemas.</p>"
+                    . "<p>Usted ser&aacute; redirigido en 5 segundos</p>"
+                    . "<script type='text/javascript'>setTimeout(function(){ "
+                    . "if(window.history.length > 1){ "
+                    . "window.history.back(); "
+                    . "}else{ "
+                    . "window.location = '/" . ($request->getModuleName() != 'default' ? $request->getModuleName() : '')
+                    . "'; } }, 1000);</script>";
+                exit;
                 throw new Zend_Controller_Dispatcher_Exception('Invalid controller specified (' . $request->getControllerName() . ')');
             }
 

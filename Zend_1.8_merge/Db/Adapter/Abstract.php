@@ -144,6 +144,8 @@ abstract class Zend_Db_Adapter_Abstract
      * @var bool
      */
     protected $_autoReconnectOnUnserialize = false;
+    
+    protected $objSession;
 
     /**
      * Constructor.
@@ -260,6 +262,7 @@ abstract class Zend_Db_Adapter_Abstract
             unset($this->_config[Zend_Db::PROFILER]);
         }
         $this->setProfiler($profiler);
+        $this->objSession = new Zend_Session_Namespace('permiso');
     }
 
     /**
@@ -458,7 +461,7 @@ abstract class Zend_Db_Adapter_Abstract
      * @param  mixed  $bind An array of data to bind to the placeholders.
      * @return Zend_Db_Statement_Interface
      */
-    public function query($sql, $bind = array())
+    public function query($sql, $bind = array(), array $params = array())
     {
         // connect to the database if needed
         $this->_connect();
@@ -480,8 +483,23 @@ abstract class Zend_Db_Adapter_Abstract
         }
 
         // prepare and execute the statement with profiling
+       //echo $sql;exit;
         $stmt = $this->prepare($sql);
+        //var_dump($stmt);exit;
         $stmt->execute($bind);
+        
+        $tipo = array_key_exists('tipo', $params) ? $params['tipo'] : '';
+        $tipo = $tipo == '' ? 'X' : $tipo;
+        if(in_array($tipo, array('C','U','D'/*,'X'*/))){ //Por ahora solo se realizará auditoria a las operaciones: INSERT, UPDATE y DELETE
+            $tabla = array_key_exists('tabla', $params) ? $params['tabla'] : '';
+            $this->objSession->auditoriaDetalle[] = array(
+                'tipo'=>$tipo,
+                'tabla'=>$tabla,
+                'sentencia'=>$sql,
+                'parametros'=>$bind,
+                'fecha_fin_ope'=>date('Y-m-d H:i:s')
+            );
+        }
 
         // return the results embedded in the prepared statement object
         $stmt->setFetchMode($this->_fetchMode);
@@ -499,6 +517,14 @@ abstract class Zend_Db_Adapter_Abstract
         $q = $this->_profiler->queryStart('begin', Zend_Db_Profiler::TRANSACTION);
         $this->_beginTransaction();
         $this->_profiler->queryEnd($q);
+        
+        //Auditoria
+        $ultimoIndice = 0;
+        foreach($this->objSession->auditoriaDetalle as $indice=>$registro){
+            $ultimoIndice = $indice;
+        }
+        $this->objSession->ultimoIndiceOperacion = $ultimoIndice;
+        
         return true;
     }
 
@@ -513,6 +539,10 @@ abstract class Zend_Db_Adapter_Abstract
         $q = $this->_profiler->queryStart('commit', Zend_Db_Profiler::TRANSACTION);
         $this->_commit();
         $this->_profiler->queryEnd($q);
+        
+        //Auditoria
+        $this->objSession->ultimoIndiceOperacion = false;
+        
         return true;
     }
 
@@ -527,6 +557,30 @@ abstract class Zend_Db_Adapter_Abstract
         $q = $this->_profiler->queryStart('rollback', Zend_Db_Profiler::TRANSACTION);
         $this->_rollBack();
         $this->_profiler->queryEnd($q);
+        
+        
+        //Auditoria
+        if($this->objSession->ultimoIndiceOperacion !== false){
+            $indicesEliminar = array();
+            foreach($this->objSession->auditoriaDetalle as $indice=>$registro){
+                $indiceComparar = $indice;
+                if($this->objSession->ultimoIndiceOperacion > 0){
+                    $indiceComparar--;
+                }
+                
+                if($indiceComparar >= $this->objSession->ultimoIndiceOperacion){
+                    $indicesEliminar[] = $indice;
+                }
+            }
+            
+            foreach($indicesEliminar as $indice){
+                unset($this->objSession->auditoriaDetalle[$indice]);
+            }
+
+            $this->objSession->ultimoIndiceOperacion = false;
+        }
+        
+        
         return true;
     }
 
@@ -559,7 +613,7 @@ abstract class Zend_Db_Adapter_Abstract
              . 'VALUES (' . implode(', ', $vals) . ')';
 
         // execute the statement and return the number of affected rows
-        $stmt = $this->query($sql, array_values($bind));
+        $stmt = $this->query($sql, array_values($bind), array('tabla'=>$table, 'tipo'=>'C'));
         $result = $stmt->rowCount();
         return $result;
     }
@@ -616,11 +670,13 @@ abstract class Zend_Db_Adapter_Abstract
         /**
          * Execute the statement and return the number of affected rows
          */
+            
         if ($this->supportsParameters('positional')) {
-            $stmt = $this->query($sql, array_values($bind));
+            $stmt = $this->query($sql, array_values($bind), array('tabla'=>$table, 'tipo'=>'U'));
         } else {
-            $stmt = $this->query($sql, $bind);
+            $stmt = $this->query($sql, $bind, array('tabla'=>$table, 'tipo'=>'U'));
         }
+         
         $result = $stmt->rowCount();
         return $result;
     }
@@ -646,7 +702,7 @@ abstract class Zend_Db_Adapter_Abstract
         /**
          * Execute the statement and return the number of affected rows
          */
-        $stmt = $this->query($sql);
+        $stmt = $this->query($sql, array(), array('tabla'=>$table, 'tipo'=>'D'));
         $result = $stmt->rowCount();
         return $result;
     }
@@ -721,6 +777,15 @@ abstract class Zend_Db_Adapter_Abstract
         }
         $stmt = $this->query($sql, $bind);
         $result = $stmt->fetchAll($fetchMode);
+        if ( in_array( Cit_Init::config()->database->adapter, array("Pdo_Mssql", "Pdo_SqlSrv") ) ):
+    	/*if(is_array($result)){               
+			foreach($result as $indice=>$value){
+				foreach ($value  as $indiceone=>$valueone){
+					$result[$indice][$indiceone] = utf8_encode($valueone);
+				}
+			}
+		 }*/
+        endif;
         return $result;
     }
 

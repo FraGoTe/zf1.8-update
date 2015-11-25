@@ -64,6 +64,9 @@ class Zend_Db_Statement_Pdo_Oci extends Zend_Db_Statement_Pdo
             }
             $results[] = $row;
         }
+       // echo 'rrrrrr'.$results;exit;
         return $results;
+        
+        
     }
 }

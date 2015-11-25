@@ -95,6 +95,10 @@ abstract class Zend_Translate_Adapter {
      */
     public function __construct($data, $locale = null, array $options = array())
     {
+        
+        if($locale!='es')
+            $locale = 'es';
+        
         if (isset(self::$_cache)) {
             $id = 'Zend_Translate_' . $this->toString() . '_Options';
             $result = self::$_cache->load($id);

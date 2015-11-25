@@ -227,13 +227,14 @@ class Zend_Db_Statement_Pdo extends Zend_Db_Statement implements IteratorAggrega
      */
     public function _execute(array $params = null)
     {
-        try {
+    	try {
             if ($params !== null) {
                 return $this->_stmt->execute($params);
             } else {
                 return $this->_stmt->execute();
             }
         } catch (PDOException $e) {
+        	
             require_once 'Zend/Db/Statement/Exception.php';
             throw new Zend_Db_Statement_Exception($e->getMessage());
         }
@@ -291,7 +292,11 @@ class Zend_Db_Statement_Pdo extends Zend_Db_Statement implements IteratorAggrega
                 }
                 return $this->_stmt->fetchAll($style, $col);
             } else {
-                return $this->_stmt->fetchAll($style);
+            	$data = $this->_stmt->fetchAll($style);
+            	foreach($data as $indice => $value){
+                	$data[$indice]=array_change_key_case($value,CASE_LOWER); 
+                }
+                return $data;
             }
         } catch (PDOException $e) {
             require_once 'Zend/Db/Statement/Exception.php';

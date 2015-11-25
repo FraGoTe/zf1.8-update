@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Zend Framework
  *
@@ -19,8 +20,6 @@
  * @license    http://framework.zend.com/license/new-bsd     New BSD License
  * @version    $Id: Mysqli.php 14692 2009-04-06 02:20:57Z norm2782 $
  */
-
-
 /**
  * @see Zend_Loader
  */

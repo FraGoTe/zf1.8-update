@@ -486,19 +486,19 @@ class Zend_Controller_Request_Http extends Zend_Controller_Request_Abstract
             // Does the baseUrl have anything in common with the request_uri?
             $requestUri = $this->getRequestUri();
 
-            if (0 === strpos($requestUri, $baseUrl)) {
+            if (0 === @strpos($requestUri, $baseUrl)) {
                 // full $baseUrl matches
                 $this->_baseUrl = $baseUrl;
                 return $this;
             }
 
-            if (0 === strpos($requestUri, dirname($baseUrl))) {
+            if (0 === @strpos($requestUri, dirname($baseUrl))) {
                 // directory portion of $baseUrl matches
                 $this->_baseUrl = rtrim(dirname($baseUrl), '/');
                 return $this;
             }
 
-            if (!strpos($requestUri, basename($baseUrl))) {
+            if (!@strpos($requestUri, basename($baseUrl))) {
                 // no match whatsoever; set it blank
                 $this->_baseUrl = '';
                 return $this;

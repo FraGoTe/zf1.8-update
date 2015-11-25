@@ -215,7 +215,7 @@ abstract class Zend_Db_Adapter_Pdo_Abstract extends Zend_Db_Adapter_Abstract
      * @return Zend_Db_Statement_Pdo
      * @throws Zend_Db_Adapter_Exception To re-throw PDOException.
      */
-    public function query($sql, $bind = array())
+    public function query($sql, $bind = array(), array $params = array())
     {
         if (empty($bind) && $sql instanceof Zend_Db_Select) {
             $bind = $sql->getBind();
@@ -232,7 +232,7 @@ abstract class Zend_Db_Adapter_Pdo_Abstract extends Zend_Db_Adapter_Abstract
         }
 
         try {
-            return parent::query($sql, $bind);
+            return parent::query($sql, $bind, $params);
         } catch (PDOException $e) {
             /**
              * @see Zend_Db_Statement_Exception
